@@ -47,7 +47,7 @@ void setup()
     ; // Wait for serial port to connect
   Serial.println("Starting BLE work!");
 
-  BLEDevice::init("MyESP32BLE"); // Initialize the device with a name for BLE
+  BLEDevice::init("RaveCapeController"); // Initialize the device with a name for BLE
   pServer = BLEDevice::createServer();
   pServer->setCallbacks(new MyServerCallbacks());
 
