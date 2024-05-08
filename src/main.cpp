@@ -2,10 +2,13 @@
 #include <BLEDevice.h>
 #include <BLEUtils.h>
 #include <BLEServer.h>
+#include "shared/LedStrip.h"
+#include "led/BlueLEDs.h"
+#include "led/RedLEDs.h"
 
 // Define the UUIDs for the BLE service and characteristic
-#define SERVICE_UUID "4fafc201-1fb5-459e-8fcc-c5c9c331914b"        // UUID for the BLE Service
-#define CHARACTERISTIC_UUID "beb5483e-36e1-4688-b7f5-ea07361b26a8" // UUID for the BLE Characteristic
+#define SERVICE_UUID "4fafc201-1fb5-459e-8fcc-c5c9c331914b"
+#define CHARACTERISTIC_UUID "beb5483e-36e1-4688-b7f5-ea07361b26a8"
 
 BLEServer *pServer = NULL;
 BLECharacteristic *pCharacteristic = NULL;
@@ -32,6 +35,14 @@ class MyCharacteristicCallbacks : public BLECharacteristicCallbacks
     if (value.length() > 0)
     {
       Serial.println(value.c_str());
+      if (value == "blue")
+      {
+        setAllLEDsToBlue();
+      }
+      else if (value == "red")
+      {
+        setAllLEDsToRed();
+      }
     }
     else
     {
@@ -42,12 +53,14 @@ class MyCharacteristicCallbacks : public BLECharacteristicCallbacks
 
 void setup()
 {
-  Serial.begin(115200); // Set the baud rate to 115200
+  Serial.begin(115200);
   while (!Serial)
-    ; // Wait for serial port to connect
+    ; // Wait for serial port to connect. Needed for native USB only.
+  setupStrips();
+  setAllLEDsToBlue();
   Serial.println("Starting BLE work!");
 
-  BLEDevice::init("RaveCapeController"); // Initialize the device with a name for BLE
+  BLEDevice::init("RaveCapeController");
   pServer = BLEDevice::createServer();
   pServer->setCallbacks(new MyServerCallbacks());
 
@@ -58,11 +71,11 @@ void setup()
           BLECharacteristic::PROPERTY_WRITE |
           BLECharacteristic::PROPERTY_NOTIFY);
 
-  pCharacteristic->setValue("Hello BLE"); // Set initial value for characteristic
+  pCharacteristic->setValue("Hello From RaveCapeController!");
   pCharacteristic->setCallbacks(new MyCharacteristicCallbacks());
 
-  pService->start();                  // Start the service
-  pServer->getAdvertising()->start(); // Start advertising
+  pService->start();
+  pServer->getAdvertising()->start();
 
   Serial.println("BLE is ready and waiting for connections.");
 }
