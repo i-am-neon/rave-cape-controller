@@ -21,3 +21,12 @@ void setupStrips()
     strips[i].show(); // Initialize all pixels to 'off'
   }
 }
+
+void setBrightness(int brightness)
+{
+  for (int i = 0; i < NUM_STRIPS; i++)
+  {
+    strips[i].setBrightness(brightness);
+    strips[i].show();
+  }
+}

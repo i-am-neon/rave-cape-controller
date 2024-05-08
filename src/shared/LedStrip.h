@@ -10,5 +10,6 @@
 extern Adafruit_NeoPixel strips[NUM_STRIPS]; // Array of strips
 
 void setupStrips();
+void setBrightness(int brightness);
 
 #endif

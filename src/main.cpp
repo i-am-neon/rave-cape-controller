@@ -43,6 +43,11 @@ class MyCharacteristicCallbacks : public BLECharacteristicCallbacks
       {
         setAllLEDsToRed();
       }
+      else if (value.rfind("brightness:", 0) == 0)
+      { // Check if the command starts with "brightness:"
+        int newBrightness = atoi(value.substr(11).c_str());
+        setBrightness(newBrightness);
+      }
     }
     else
     {
