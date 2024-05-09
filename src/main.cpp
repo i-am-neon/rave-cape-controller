@@ -9,6 +9,7 @@
 #include "led/PulseOneColor.h"
 #include "led/EmanateOneColor.h"
 #include "led/FlowOneColor.h"
+#include "led/Gradient.h"
 
 // Define the UUIDs for the BLE service and characteristic
 #define SERVICE_UUID "4fafc201-1fb5-459e-8fcc-c5c9c331914b"
@@ -19,6 +20,8 @@ BLECharacteristic *pCharacteristic = NULL;
 
 std::string currentAnimation = "";
 uint32_t currentColor = 0xFF0000; // Default to red
+uint32_t color1 = 0xFF0000;
+uint32_t color2 = 0xFFFF00;
 
 class MyServerCallbacks : public BLEServerCallbacks
 {
@@ -77,6 +80,14 @@ class MyCharacteristicCallbacks : public BLECharacteristicCallbacks
         Serial.print("Color: ");
         Serial.println(currentColor, HEX);
       }
+      else if (value.find("gradient:") == 0)
+      {
+        currentAnimation = "gradient";
+        size_t colonPos = value.find(':');
+        size_t commaPos = value.find(',', colonPos + 1);
+        color1 = strtol(value.substr(colonPos + 1, commaPos).c_str(), NULL, 16);
+        color2 = strtol(value.substr(commaPos + 1).c_str(), NULL, 16);
+      }
       else if (value.find("brightness:") == 0)
       {
         int newBrightness = atoi(value.substr(11).c_str());
@@ -97,8 +108,8 @@ void setup()
     ; // Wait for serial port to connect. Needed for native USB only.
   setupStrips();
   // Set the initial animation
-  currentAnimation = "rainbow_flow";
-  // currentAnimation = "emanate_one_color";
+  currentAnimation = "gradient";
+  // currentAnimation = "rainbow_flow";
   Serial.println("Starting BLE work!");
 
   BLEDevice::init("RaveCapeController");
@@ -140,5 +151,9 @@ void loop()
   {
     setEmanateOneColor(0xFF0000);
     // setEmanateOneColor(currentColor);
+  }
+  else if (currentAnimation == "gradient")
+  {
+    setGradient(color1, color2);
   }
 }
