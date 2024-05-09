@@ -51,7 +51,6 @@ class MyCharacteristicCallbacks : public BLECharacteristicCallbacks
       else if (value == "rainbow_flow")
       {
         currentAnimation = "rainbow_flow";
-        // setRainbowFlow();
       }
       else if (value.rfind("brightness:", 0) == 0)
       { // Check if the command starts with "brightness:"
@@ -72,8 +71,8 @@ void setup()
   while (!Serial)
     ; // Wait for serial port to connect. Needed for native USB only.
   setupStrips();
-  // setAllLEDsToBlue();
-
+  // Set the initial animation
+  currentAnimation = "rainbow_flow";
   Serial.println("Starting BLE work!");
 
   BLEDevice::init("RaveCapeController");
