@@ -5,6 +5,7 @@
 #include "shared/LedStrip.h"
 #include "led/BlueLEDs.h"
 #include "led/RedLEDs.h"
+#include "led/RainbowFlow.h"
 
 // Define the UUIDs for the BLE service and characteristic
 #define SERVICE_UUID "4fafc201-1fb5-459e-8fcc-c5c9c331914b"
@@ -43,6 +44,10 @@ class MyCharacteristicCallbacks : public BLECharacteristicCallbacks
       {
         setAllLEDsToRed();
       }
+      else if (value == "rainbow_flow")
+      {
+        setRainbowFlow();
+      }
       else if (value.rfind("brightness:", 0) == 0)
       { // Check if the command starts with "brightness:"
         int newBrightness = atoi(value.substr(11).c_str());
@@ -62,7 +67,9 @@ void setup()
   while (!Serial)
     ; // Wait for serial port to connect. Needed for native USB only.
   setupStrips();
-  setAllLEDsToBlue();
+  // setAllLEDsToBlue();
+  setRainbowFlow();
+
   Serial.println("Starting BLE work!");
 
   BLEDevice::init("RaveCapeController");
