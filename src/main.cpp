@@ -6,7 +6,7 @@
 #include "led/BlueLEDs.h"
 #include "led/RedLEDs.h"
 #include "led/RainbowFlow.h"
-#include "led/PulseOneColor.h"
+#include "led/Pulse.h"
 #include "led/EmanateOneColor.h"
 #include "led/FlowOneColor.h"
 #include "led/Gradient.h"
@@ -43,62 +43,68 @@ class MyCharacteristicCallbacks : public BLECharacteristicCallbacks
     if (value.length() > 0)
     {
       Serial.println(value.c_str());
-      if (value == "blue")
-      {
-        currentAnimation = "";
-        setAllLEDsToBlue();
-      }
-      else if (value == "red")
-      {
-        currentAnimation = "";
-        setAllLEDsToRed();
-      }
-      else if (value == "rainbow_flow")
-      {
-        currentAnimation = "rainbow_flow";
-      }
-      else if (value.find("flow_one_color:") == 0)
-      {
-        currentAnimation = "flow_one_color";
-        uint32_t color = strtol(value.substr(16).c_str(), NULL, 16);
-        gradientColors = {color};
-      }
-      else if (value.find("pulse_one_color:") == 0)
-      {
-        currentAnimation = "pulse_one_color";
-        uint32_t color = strtol(value.substr(16).c_str(), NULL, 16);
-        gradientColors = {color};
-      }
-      else if (value.find("emanate_one_color:") == 0)
-      {
-        currentAnimation = "emanate_one_color";
-        uint32_t color = strtol(value.substr(16).c_str(), NULL, 16);
-        gradientColors = {color};
-      }
-      else if (value.find("gradient:") == 0)
-      {
-        currentAnimation = "gradient";
-        size_t pos = value.find(':') + 1;
-        gradientColors.clear();
-        while (pos < value.length())
-        {
-          size_t nextComma = value.find(',', pos);
-          if (nextComma == std::string::npos)
-            nextComma = value.length();
-          uint32_t color = strtol(value.substr(pos, nextComma - pos).c_str(), NULL, 16);
-          gradientColors.push_back(color);
-          pos = nextComma + 1;
-        }
-      }
-      else if (value.find("brightness:") == 0)
-      {
-        int newBrightness = atoi(value.substr(11).c_str());
-        setBrightness(newBrightness);
-      }
+      parseColors(value);
     }
     else
     {
       Serial.println("Empty");
+    }
+  }
+
+  void parseColors(const std::string &value)
+  {
+    if (value == "blue")
+    {
+      currentAnimation = "";
+      setAllLEDsToBlue();
+    }
+    else if (value == "red")
+    {
+      currentAnimation = "";
+      setAllLEDsToRed();
+    }
+    else if (value == "rainbow_flow")
+    {
+      currentAnimation = "rainbow_flow";
+    }
+    else if (value.find("gradient:") == 0)
+    {
+      currentAnimation = "gradient";
+      parseGradientColors(value.substr(value.find(':') + 1));
+    }
+    else if (value.find("brightness:") == 0)
+    {
+      int newBrightness = atoi(value.substr(11).c_str());
+      setBrightness(newBrightness);
+    }
+    else
+    {
+      parseAnimationAndColor(value);
+    }
+  }
+
+  void parseAnimationAndColor(const std::string &value)
+  {
+    size_t colonPos = value.find(':');
+    if (colonPos != std::string::npos)
+    {
+      currentAnimation = value.substr(0, colonPos);
+      parseGradientColors(value.substr(colonPos + 1));
+    }
+  }
+
+  void parseGradientColors(const std::string &colorString)
+  {
+    gradientColors.clear();
+    size_t pos = 0;
+    while (pos < colorString.length())
+    {
+      size_t nextComma = colorString.find(',', pos);
+      if (nextComma == std::string::npos)
+        nextComma = colorString.length();
+      uint32_t color = strtol(colorString.substr(pos, nextComma - pos).c_str(), NULL, 16);
+      gradientColors.push_back(color);
+      pos = nextComma + 1;
     }
   }
 };
@@ -141,9 +147,9 @@ void loop()
   {
     setFlowOneColor(gradientColors[0]);
   }
-  else if (currentAnimation == "pulse_one_color" && !gradientColors.empty())
+  else if (currentAnimation == "pulse" && !gradientColors.empty())
   {
-    setPulseOneColor(gradientColors[0]);
+    setPulse(gradientColors);
   }
   else if (currentAnimation == "emanate_one_color" && !gradientColors.empty())
   {
