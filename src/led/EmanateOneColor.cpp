@@ -22,7 +22,7 @@ void setEmanateOneColor(uint32_t color)
       {
         // Calculate distance from the center
         int distanceFromCenter = abs((NUM_LEDS_PER_STRIP / 2) - led);
-        float brightness = 0.1; // Start all LEDs at 10% brightness
+        float brightness = 0.2; // Start all LEDs at 10% brightness
 
         // Calculate brightness based on position in the wave
         if (distanceFromCenter <= currentRadius && distanceFromCenter >= currentRadius - waveWidth)
@@ -31,7 +31,7 @@ void setEmanateOneColor(uint32_t color)
         }
         else if (distanceFromCenter < currentRadius - waveWidth)
         {
-          brightness = 0.1; // Dim the LEDs that are not part of the current wave
+          brightness = 0.2; // Dim the LEDs that are not part of the current wave
         }
 
         // Apply the calculated brightness

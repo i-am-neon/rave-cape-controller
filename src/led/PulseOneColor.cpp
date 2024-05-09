@@ -5,7 +5,7 @@ extern int currentMaxBrightness; // Ensure global brightness is accessible
 
 void setPulseOneColor(uint32_t color)
 {
-  static float brightness = 0.1; // Should be static to maintain state between calls
+  static float brightness = 0.2; // Should be static to maintain state between calls
   static bool increasing = true; // Should be static to maintain state between calls
   const float brightnessStep = 0.05;
   const long interval = 50;                // Adjusted for faster animation
@@ -41,9 +41,9 @@ void setPulseOneColor(uint32_t color)
     else
     {
       brightness -= brightnessStep;
-      if (brightness <= 0.1)
+      if (brightness <= 0.2)
       {
-        brightness = 0.1; // Ensure it does not go below 0.1
+        brightness = 0.2; // Ensure it does not go below 0.2
         increasing = true;
       }
     }

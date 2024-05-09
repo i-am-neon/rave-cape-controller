@@ -8,6 +8,7 @@
 #include "led/RainbowFlow.h"
 #include "led/PulseOneColor.h"
 #include "led/EmanateOneColor.h"
+#include "led/FlowOneColor.h"
 
 // Define the UUIDs for the BLE service and characteristic
 #define SERVICE_UUID "4fafc201-1fb5-459e-8fcc-c5c9c331914b"
@@ -54,6 +55,13 @@ class MyCharacteristicCallbacks : public BLECharacteristicCallbacks
       else if (value == "rainbow_flow")
       {
         currentAnimation = "rainbow_flow";
+      }
+      else if (value.find("flow_one_color:") == 0)
+      {
+        currentAnimation = "flow_one_color";
+        currentColor = strtol(value.substr(16).c_str(), NULL, 16); // Parse the hex color code
+        Serial.print("Color: ");
+        Serial.println(currentColor, HEX);
       }
       else if (value.find("pulse_one_color:") == 0)
       {
@@ -118,6 +126,11 @@ void loop()
   if (currentAnimation == "rainbow_flow")
   {
     setRainbowFlow();
+  }
+  else if (currentAnimation == "flow_one_color")
+  {
+    setFlowOneColor(0xFF0000);
+    // setFlowOneColor(currentColor);
   }
   else if (currentAnimation == "pulse_one_color")
   {
