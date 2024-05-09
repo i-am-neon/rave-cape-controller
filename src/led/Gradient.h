@@ -1,6 +1,9 @@
 #ifndef GRADIENT_H
 #define GRADIENT_H
 
-void setGradient(uint32_t topColor, uint32_t bottomColor);
+#include <Arduino.h>
+#include <vector>
+
+void setGradient(const std::vector<uint32_t> &colors);
 
 #endif

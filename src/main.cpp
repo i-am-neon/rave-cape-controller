@@ -19,9 +19,7 @@ BLEServer *pServer = NULL;
 BLECharacteristic *pCharacteristic = NULL;
 
 std::string currentAnimation = "";
-uint32_t currentColor = 0xFF0000; // Default to red
-uint32_t color1 = 0xFF0000;
-uint32_t color2 = 0xFFFF00;
+std::vector<uint32_t> gradientColors;
 
 class MyServerCallbacks : public BLEServerCallbacks
 {
@@ -62,31 +60,35 @@ class MyCharacteristicCallbacks : public BLECharacteristicCallbacks
       else if (value.find("flow_one_color:") == 0)
       {
         currentAnimation = "flow_one_color";
-        currentColor = strtol(value.substr(16).c_str(), NULL, 16); // Parse the hex color code
-        Serial.print("Color: ");
-        Serial.println(currentColor, HEX);
+        uint32_t color = strtol(value.substr(16).c_str(), NULL, 16);
+        gradientColors = {color};
       }
       else if (value.find("pulse_one_color:") == 0)
       {
         currentAnimation = "pulse_one_color";
-        currentColor = strtol(value.substr(16).c_str(), NULL, 16); // Parse the hex color code
-        Serial.print("Color: ");
-        Serial.println(currentColor, HEX);
+        uint32_t color = strtol(value.substr(16).c_str(), NULL, 16);
+        gradientColors = {color};
       }
       else if (value.find("emanate_one_color:") == 0)
       {
         currentAnimation = "emanate_one_color";
-        currentColor = strtol(value.substr(16).c_str(), NULL, 16); // Parse the hex color code
-        Serial.print("Color: ");
-        Serial.println(currentColor, HEX);
+        uint32_t color = strtol(value.substr(16).c_str(), NULL, 16);
+        gradientColors = {color};
       }
       else if (value.find("gradient:") == 0)
       {
         currentAnimation = "gradient";
-        size_t colonPos = value.find(':');
-        size_t commaPos = value.find(',', colonPos + 1);
-        color1 = strtol(value.substr(colonPos + 1, commaPos).c_str(), NULL, 16);
-        color2 = strtol(value.substr(commaPos + 1).c_str(), NULL, 16);
+        size_t pos = value.find(':') + 1;
+        gradientColors.clear();
+        while (pos < value.length())
+        {
+          size_t nextComma = value.find(',', pos);
+          if (nextComma == std::string::npos)
+            nextComma = value.length();
+          uint32_t color = strtol(value.substr(pos, nextComma - pos).c_str(), NULL, 16);
+          gradientColors.push_back(color);
+          pos = nextComma + 1;
+        }
       }
       else if (value.find("brightness:") == 0)
       {
@@ -107,11 +109,8 @@ void setup()
   while (!Serial)
     ; // Wait for serial port to connect. Needed for native USB only.
   setupStrips();
-  // Set the initial animation
-  currentAnimation = "gradient";
-  // currentAnimation = "rainbow_flow";
-  Serial.println("Starting BLE work!");
 
+  Serial.println("Starting BLE work!");
   BLEDevice::init("RaveCapeController");
   pServer = BLEDevice::createServer();
   pServer->setCallbacks(new MyServerCallbacks());
@@ -138,22 +137,20 @@ void loop()
   {
     setRainbowFlow();
   }
-  else if (currentAnimation == "flow_one_color")
+  else if (currentAnimation == "flow_one_color" && !gradientColors.empty())
   {
-    setFlowOneColor(0xFF0000);
-    // setFlowOneColor(currentColor);
+    setFlowOneColor(gradientColors[0]);
   }
-  else if (currentAnimation == "pulse_one_color")
+  else if (currentAnimation == "pulse_one_color" && !gradientColors.empty())
   {
-    setPulseOneColor(currentColor);
+    setPulseOneColor(gradientColors[0]);
   }
-  else if (currentAnimation == "emanate_one_color")
+  else if (currentAnimation == "emanate_one_color" && !gradientColors.empty())
   {
-    setEmanateOneColor(0xFF0000);
-    // setEmanateOneColor(currentColor);
+    setEmanateOneColor(gradientColors[0]);
   }
-  else if (currentAnimation == "gradient")
+  else if (currentAnimation == "gradient" && !gradientColors.empty())
   {
-    setGradient(color1, color2);
+    setGradient(gradientColors);
   }
 }
