@@ -14,6 +14,8 @@
 BLEServer *pServer = NULL;
 BLECharacteristic *pCharacteristic = NULL;
 
+std::string currentAnimation = "";
+
 class MyServerCallbacks : public BLEServerCallbacks
 {
   void onConnect(BLEServer *pServer)
@@ -32,21 +34,24 @@ class MyCharacteristicCallbacks : public BLECharacteristicCallbacks
   void onWrite(BLECharacteristic *pCharacteristic)
   {
     std::string value = pCharacteristic->getValue();
-    Serial.print("New Value Received: ");
+    Serial.print("Msg: ");
     if (value.length() > 0)
     {
       Serial.println(value.c_str());
       if (value == "blue")
       {
+        currentAnimation = ""; // Stop continuous animations
         setAllLEDsToBlue();
       }
       else if (value == "red")
       {
+        currentAnimation = ""; // Stop continuous animations
         setAllLEDsToRed();
       }
       else if (value == "rainbow_flow")
       {
-        setRainbowFlow();
+        currentAnimation = "rainbow_flow";
+        // setRainbowFlow();
       }
       else if (value.rfind("brightness:", 0) == 0)
       { // Check if the command starts with "brightness:"
@@ -68,7 +73,6 @@ void setup()
     ; // Wait for serial port to connect. Needed for native USB only.
   setupStrips();
   // setAllLEDsToBlue();
-  setRainbowFlow();
 
   Serial.println("Starting BLE work!");
 
@@ -94,7 +98,8 @@ void setup()
 
 void loop()
 {
-  // Nothing to do here, just wait for BLE events
-  delay(1000);
-  Serial.println("in loop...");
+  if (currentAnimation == "rainbow_flow")
+  {
+    setRainbowFlow();
+  }
 }
