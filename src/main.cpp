@@ -7,6 +7,7 @@
 #include "led/RedLEDs.h"
 #include "led/RainbowFlow.h"
 #include "led/PulseOneColor.h"
+#include "led/EmanateOneColor.h"
 
 // Define the UUIDs for the BLE service and characteristic
 #define SERVICE_UUID "4fafc201-1fb5-459e-8fcc-c5c9c331914b"
@@ -61,6 +62,13 @@ class MyCharacteristicCallbacks : public BLECharacteristicCallbacks
         Serial.print("Color: ");
         Serial.println(currentColor, HEX);
       }
+      else if (value.find("emanate_one_color:") == 0)
+      {
+        currentAnimation = "emanate_one_color";
+        currentColor = strtol(value.substr(16).c_str(), NULL, 16); // Parse the hex color code
+        Serial.print("Color: ");
+        Serial.println(currentColor, HEX);
+      }
       else if (value.find("brightness:") == 0)
       {
         int newBrightness = atoi(value.substr(11).c_str());
@@ -82,7 +90,7 @@ void setup()
   setupStrips();
   // Set the initial animation
   currentAnimation = "rainbow_flow";
-  // currentAnimation = "pulse_one_color";
+  // currentAnimation = "emanate_one_color";
   Serial.println("Starting BLE work!");
 
   BLEDevice::init("RaveCapeController");
@@ -114,5 +122,10 @@ void loop()
   else if (currentAnimation == "pulse_one_color")
   {
     setPulseOneColor(currentColor);
+  }
+  else if (currentAnimation == "emanate_one_color")
+  {
+    setEmanateOneColor(0xFF0000);
+    // setEmanateOneColor(currentColor);
   }
 }
