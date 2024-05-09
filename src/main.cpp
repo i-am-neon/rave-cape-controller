@@ -6,6 +6,7 @@
 #include "led/BlueLEDs.h"
 #include "led/RedLEDs.h"
 #include "led/RainbowFlow.h"
+#include "led/PulseOneColor.h"
 
 // Define the UUIDs for the BLE service and characteristic
 #define SERVICE_UUID "4fafc201-1fb5-459e-8fcc-c5c9c331914b"
@@ -15,6 +16,7 @@ BLEServer *pServer = NULL;
 BLECharacteristic *pCharacteristic = NULL;
 
 std::string currentAnimation = "";
+uint32_t currentColor = 0xFF0000; // Default to red
 
 class MyServerCallbacks : public BLEServerCallbacks
 {
@@ -40,20 +42,27 @@ class MyCharacteristicCallbacks : public BLECharacteristicCallbacks
       Serial.println(value.c_str());
       if (value == "blue")
       {
-        currentAnimation = ""; // Stop continuous animations
+        currentAnimation = "";
         setAllLEDsToBlue();
       }
       else if (value == "red")
       {
-        currentAnimation = ""; // Stop continuous animations
+        currentAnimation = "";
         setAllLEDsToRed();
       }
       else if (value == "rainbow_flow")
       {
         currentAnimation = "rainbow_flow";
       }
-      else if (value.rfind("brightness:", 0) == 0)
-      { // Check if the command starts with "brightness:"
+      else if (value.find("pulse_one_color:") == 0)
+      {
+        currentAnimation = "pulse_one_color";
+        currentColor = strtol(value.substr(16).c_str(), NULL, 16); // Parse the hex color code
+        Serial.print("Color: ");
+        Serial.println(currentColor, HEX);
+      }
+      else if (value.find("brightness:") == 0)
+      {
         int newBrightness = atoi(value.substr(11).c_str());
         setBrightness(newBrightness);
       }
@@ -73,6 +82,7 @@ void setup()
   setupStrips();
   // Set the initial animation
   currentAnimation = "rainbow_flow";
+  // currentAnimation = "pulse_one_color";
   Serial.println("Starting BLE work!");
 
   BLEDevice::init("RaveCapeController");
@@ -100,5 +110,9 @@ void loop()
   if (currentAnimation == "rainbow_flow")
   {
     setRainbowFlow();
+  }
+  else if (currentAnimation == "pulse_one_color")
+  {
+    setPulseOneColor(currentColor);
   }
 }

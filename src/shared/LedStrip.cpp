@@ -1,5 +1,6 @@
 #include "LedStrip.h"
 
+int currentMaxBrightness = DEFAULT_MAX_BRIGHTNESS; // Initialize with default maximum brightness
 int ledPins[NUM_STRIPS] = {22, 21, 4, 15, 32, 26, 12, 13};
 
 Adafruit_NeoPixel strips[NUM_STRIPS] = {
@@ -17,13 +18,14 @@ void setupStrips()
   for (int i = 0; i < NUM_STRIPS; i++)
   {
     strips[i].begin();
-    strips[i].setBrightness(BRIGHTNESS);
+    strips[i].setBrightness(currentMaxBrightness);
     strips[i].show(); // Initialize all pixels to 'off'
   }
 }
 
 void setBrightness(int brightness)
 {
+  currentMaxBrightness = brightness; // Update the global brightness level
   for (int i = 0; i < NUM_STRIPS; i++)
   {
     strips[i].setBrightness(brightness);
