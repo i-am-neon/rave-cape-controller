@@ -1,6 +1,6 @@
 #include "LedStrip.h"
 
-int ledPins[NUM_STRIPS] = {4, 5, 12, 13, 14, 15, 18, 19};
+int ledPins[NUM_STRIPS] = {22, 21, 4, 15, 32, 26, 12, 13};
 
 Adafruit_NeoPixel strips[NUM_STRIPS] = {
     Adafruit_NeoPixel(NUM_LEDS_PER_STRIP, ledPins[0], NEO_GRB + NEO_KHZ800),
