@@ -116,6 +116,9 @@ void setup()
     ; // Wait for serial port to connect. Needed for native USB only.
   setupStrips();
 
+  // Starting animation
+  currentAnimation = "rainbow_flow";
+
   Serial.println("Starting BLE work!");
   BLEDevice::init("RaveCapeController");
   pServer = BLEDevice::createServer();
