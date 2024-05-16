@@ -6,5 +6,6 @@
 
 uint32_t interpolateColor(uint32_t color1, uint32_t color2, float ratio);
 uint32_t interpolateColorBasedOnCount(const std::vector<uint32_t> &colors, int index, int total);
+uint32_t interpolateGradient(const std::vector<uint32_t> &colors, float position);
 
 #endif

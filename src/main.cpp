@@ -8,6 +8,7 @@
 #include "led/RainbowFlow.h"
 #include "led/Pulse.h"
 #include "led/EmanateOneColor.h"
+#include "led/Emanate.h"
 #include "led/FlowOneColor.h"
 #include "led/Solid.h"
 #include "led/Flow.h" // Include the new header
@@ -81,6 +82,11 @@ class MyCharacteristicCallbacks : public BLECharacteristicCallbacks
     else if (value.find("flow:") == 0)
     {
       currentAnimation = "flow";
+      parseChosenColors(value.substr(value.find(':') + 1));
+    }
+    else if (value.find("emanate:") == 0)
+    {
+      currentAnimation = "emanate";
       parseChosenColors(value.substr(value.find(':') + 1));
     }
     else
@@ -171,5 +177,8 @@ void loop()
   else if (currentAnimation == "flow" && chosenColors.size() >= 2)
   {
     setFlow(chosenColors);
+  }
+  {
+    setEmanate(chosenColors);
   }
 }
