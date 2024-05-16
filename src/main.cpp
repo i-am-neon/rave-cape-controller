@@ -19,7 +19,7 @@ BLEServer *pServer = NULL;
 BLECharacteristic *pCharacteristic = NULL;
 
 std::string currentAnimation = "";
-std::vector<uint32_t> gradientColors;
+std::vector<uint32_t> chosenColors;
 
 class MyServerCallbacks : public BLEServerCallbacks
 {
@@ -70,7 +70,7 @@ class MyCharacteristicCallbacks : public BLECharacteristicCallbacks
     else if (value.find("gradient:") == 0)
     {
       currentAnimation = "gradient";
-      parseGradientColors(value.substr(value.find(':') + 1));
+      parseChosenColors(value.substr(value.find(':') + 1));
     }
     else if (value.find("brightness:") == 0)
     {
@@ -89,13 +89,13 @@ class MyCharacteristicCallbacks : public BLECharacteristicCallbacks
     if (colonPos != std::string::npos)
     {
       currentAnimation = value.substr(0, colonPos);
-      parseGradientColors(value.substr(colonPos + 1));
+      parseChosenColors(value.substr(colonPos + 1));
     }
   }
 
-  void parseGradientColors(const std::string &colorString)
+  void parseChosenColors(const std::string &colorString)
   {
-    gradientColors.clear();
+    chosenColors.clear();
     size_t pos = 0;
     while (pos < colorString.length())
     {
@@ -103,7 +103,7 @@ class MyCharacteristicCallbacks : public BLECharacteristicCallbacks
       if (nextComma == std::string::npos)
         nextComma = colorString.length();
       uint32_t color = strtol(colorString.substr(pos, nextComma - pos).c_str(), NULL, 16);
-      gradientColors.push_back(color);
+      chosenColors.push_back(color);
       pos = nextComma + 1;
     }
   }
@@ -146,20 +146,20 @@ void loop()
   {
     setRainbowFlow();
   }
-  else if (currentAnimation == "flow_one_color" && !gradientColors.empty())
+  else if (currentAnimation == "flow_one_color" && !chosenColors.empty())
   {
-    setFlowOneColor(gradientColors[0]);
+    setFlowOneColor(chosenColors[0]);
   }
-  else if (currentAnimation == "pulse" && !gradientColors.empty())
+  else if (currentAnimation == "pulse" && !chosenColors.empty())
   {
-    setPulse(gradientColors);
+    setPulse(chosenColors);
   }
-  else if (currentAnimation == "emanate_one_color" && !gradientColors.empty())
+  else if (currentAnimation == "emanate_one_color" && !chosenColors.empty())
   {
-    setEmanateOneColor(gradientColors[0]);
+    setEmanateOneColor(chosenColors[0]);
   }
-  else if (currentAnimation == "gradient" && !gradientColors.empty())
+  else if (currentAnimation == "gradient" && !chosenColors.empty())
   {
-    setGradient(gradientColors);
+    setGradient(chosenColors);
   }
 }
