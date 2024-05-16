@@ -1,8 +1,8 @@
-#include "Gradient.h"
+#include "Solid.h"
 #include "shared/LedStrip.h"
 #include "shared/ColorUtils.h"
 
-void setGradient(const std::vector<uint32_t> &colors)
+void setSolid(const std::vector<uint32_t> &colors)
 {
   int numLEDs = strips[0].numPixels();
 

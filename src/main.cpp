@@ -9,7 +9,7 @@
 #include "led/Pulse.h"
 #include "led/EmanateOneColor.h"
 #include "led/FlowOneColor.h"
-#include "led/Gradient.h"
+#include "led/Solid.h"
 
 // Define the UUIDs for the BLE service and characteristic
 #define SERVICE_UUID "4fafc201-1fb5-459e-8fcc-c5c9c331914b"
@@ -67,9 +67,9 @@ class MyCharacteristicCallbacks : public BLECharacteristicCallbacks
     {
       currentAnimation = "rainbow_flow";
     }
-    else if (value.find("gradient:") == 0)
+    else if (value.find("solid:") == 0)
     {
-      currentAnimation = "gradient";
+      currentAnimation = "solid";
       parseChosenColors(value.substr(value.find(':') + 1));
     }
     else if (value.find("brightness:") == 0)
@@ -158,8 +158,8 @@ void loop()
   {
     setEmanateOneColor(chosenColors[0]);
   }
-  else if (currentAnimation == "gradient" && !chosenColors.empty())
+  else if (currentAnimation == "solid" && !chosenColors.empty())
   {
-    setGradient(chosenColors);
+    setSolid(chosenColors);
   }
 }
