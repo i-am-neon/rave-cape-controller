@@ -1,7 +1,7 @@
 #include "LedStrip.h"
 
 int currentMaxBrightness = DEFAULT_MAX_BRIGHTNESS; // Initialize with default maximum brightness
-int ledPins[NUM_STRIPS] = {22, 21, 4, 15, 32, 26, 12, 13};
+int ledPins[NUM_STRIPS] = {32, 25, 27, 12, 19, 5, 4, 15};
 
 Adafruit_NeoPixel strips[NUM_STRIPS] = {
     Adafruit_NeoPixel(NUM_LEDS_PER_STRIP, ledPins[0], NEO_GRB + NEO_KHZ800),
