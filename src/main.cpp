@@ -10,6 +10,7 @@
 #include "led/EmanateOneColor.h"
 #include "led/FlowOneColor.h"
 #include "led/Solid.h"
+#include "led/Flow.h" // Include the new header
 
 // Define the UUIDs for the BLE service and characteristic
 #define SERVICE_UUID "4fafc201-1fb5-459e-8fcc-c5c9c331914b"
@@ -76,6 +77,11 @@ class MyCharacteristicCallbacks : public BLECharacteristicCallbacks
     {
       int newBrightness = atoi(value.substr(11).c_str());
       setBrightness(newBrightness);
+    }
+    else if (value.find("flow:") == 0)
+    {
+      currentAnimation = "flow";
+      parseChosenColors(value.substr(value.find(':') + 1));
     }
     else
     {
@@ -161,5 +167,9 @@ void loop()
   else if (currentAnimation == "solid" && !chosenColors.empty())
   {
     setSolid(chosenColors);
+  }
+  else if (currentAnimation == "flow" && chosenColors.size() >= 2)
+  {
+    setFlow(chosenColors);
   }
 }
