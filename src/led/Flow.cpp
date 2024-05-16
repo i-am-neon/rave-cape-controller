@@ -34,17 +34,21 @@ void setFlow(const std::vector<uint32_t> &colors)
 
 uint32_t interpolateGradient(const std::vector<uint32_t> &colors, float position)
 {
-  if (colors.size() < 2)
-    return colors[0];
+  // Ensure smooth transition by extending the gradient to wrap around
+  std::vector<uint32_t> extendedColors = colors;
+  extendedColors.push_back(colors[0]);
 
-  float segmentLength = 1.0 / (colors.size() - 1);
+  if (extendedColors.size() < 2)
+    return extendedColors[0];
+
+  float segmentLength = 1.0 / (extendedColors.size() - 1);
   int leftIndex = position / segmentLength;
   int rightIndex = leftIndex + 1;
 
-  if (rightIndex >= colors.size())
+  if (rightIndex >= extendedColors.size())
     rightIndex = 0;
 
   float localPosition = (position - (leftIndex * segmentLength)) / segmentLength;
 
-  return interpolateColor(colors[leftIndex], colors[rightIndex], localPosition);
+  return interpolateColor(extendedColors[leftIndex], extendedColors[rightIndex], localPosition);
 }
