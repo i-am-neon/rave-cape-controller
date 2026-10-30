@@ -21,7 +21,7 @@ void setRainbowFlow()
         // Update each pixel in the strip with the next color in the wheel
         strips[i].setPixelColor(strips[i].numPixels() - 1 - k, ColorWheel(((k * 256 / strips[i].numPixels()) + j) & 255));
       }
-      strips[i].show(); // Send the updated colors to the strip
+      showStrip(strips[i]); // Send the updated colors to the strip
     }
 
     j = (j + 1) % 256; // Increment j, wrapping around at 256

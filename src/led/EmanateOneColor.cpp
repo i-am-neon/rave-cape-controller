@@ -41,7 +41,7 @@ void setEmanateOneColor(uint32_t color)
 
         strips[strip].setPixelColor(led, strips[strip].Color(r, g, b));
       }
-      strips[strip].show();
+      showStrip(strips[strip]);
     }
 
     currentRadius++;

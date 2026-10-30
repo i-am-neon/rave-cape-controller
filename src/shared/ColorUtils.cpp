@@ -10,6 +10,8 @@ uint32_t interpolateColor(uint32_t color1, uint32_t color2, float ratio)
 
 uint32_t interpolateColorBasedOnCount(const std::vector<uint32_t> &colors, int index, int total)
 {
+  if (colors.empty())
+    return 0;
   float ratio = float(index) / float(total - 1);
   if (colors.size() == 1)
   {
@@ -35,6 +37,9 @@ uint32_t interpolateColorBasedOnCount(const std::vector<uint32_t> &colors, int i
 
 uint32_t interpolateGradient(const std::vector<uint32_t> &colors, float position)
 {
+  if (colors.empty())
+    return 0;
+
   // Ensure smooth transition by extending the gradient to wrap around
   std::vector<uint32_t> extendedColors = colors;
   extendedColors.push_back(colors[0]);

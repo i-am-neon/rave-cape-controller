@@ -29,7 +29,7 @@ void setEmanate(const std::vector<uint32_t> &colors)
         // Apply the color without changing brightness
         strips[strip].setPixelColor(led, gradientColor);
       }
-      strips[strip].show();
+      showStrip(strips[strip]);
     }
 
     currentRadius = (currentRadius + 1) % numLEDs; // Increment and wrap currentRadius

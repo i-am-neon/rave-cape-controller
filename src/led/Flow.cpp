@@ -25,7 +25,7 @@ void setFlow(const std::vector<uint32_t> &colors)
         uint32_t color = interpolateGradient(colors, position);
         strips[i].setPixelColor(j, color);
       }
-      strips[i].show(); // Send the updated colors to the strip
+      showStrip(strips[i]); // Send the updated colors to the strip
     }
 
     flowPosition = (flowPosition + 1) % numLEDs; // Decrement flowPosition, wrapping around at numLEDs

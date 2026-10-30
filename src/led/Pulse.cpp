@@ -30,7 +30,7 @@ void setPulse(const std::vector<uint32_t> &colors)
 
         strips[i].setPixelColor(j, strips[i].Color(r, g, b));
       }
-      strips[i].show();
+      showStrip(strips[i]);
     }
 
     if (increasing)

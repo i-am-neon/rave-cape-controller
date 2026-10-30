@@ -23,6 +23,10 @@ BLECharacteristic *pCharacteristic = NULL;
 std::string currentAnimation = "";
 std::vector<uint32_t> chosenColors;
 
+// BLE writes arrive on the Bluetooth task; queue them so only loop() touches animation state
+#define MAX_MESSAGE_LENGTH 128
+QueueHandle_t messageQueue;
+
 class MyServerCallbacks : public BLEServerCallbacks
 {
   void onConnect(BLEServer *pServer)
@@ -33,93 +37,100 @@ class MyServerCallbacks : public BLEServerCallbacks
   void onDisconnect(BLEServer *pServer)
   {
     Serial.println("Client Disconnected");
+    pServer->startAdvertising(); // Stay discoverable so the phone can reconnect
   }
 };
+
+void parseColors(const std::string &value);
+void parseAnimationAndColor(const std::string &value);
+void parseChosenColors(const std::string &colorString);
 
 class MyCharacteristicCallbacks : public BLECharacteristicCallbacks
 {
   void onWrite(BLECharacteristic *pCharacteristic)
   {
     std::string value = pCharacteristic->getValue();
-    Serial.print("Msg: ");
-    if (value.length() > 0)
+    if (value.length() == 0 || value.length() >= MAX_MESSAGE_LENGTH)
     {
-      Serial.println(value.c_str());
-      parseColors(value);
+      Serial.println("Msg: Empty or too long");
+      return;
     }
-    else
-    {
-      Serial.println("Empty");
-    }
-  }
 
-  void parseColors(const std::string &value)
-  {
-    if (value == "blue")
+    char message[MAX_MESSAGE_LENGTH] = {0};
+    value.copy(message, value.length());
+    if (xQueueSend(messageQueue, message, 0) != pdTRUE)
     {
-      currentAnimation = "";
-      setAllLEDsToBlue();
-    }
-    else if (value == "red")
-    {
-      currentAnimation = "";
-      setAllLEDsToRed();
-    }
-    else if (value == "rainbow_flow")
-    {
-      currentAnimation = "rainbow_flow";
-    }
-    else if (value.find("solid:") == 0)
-    {
-      currentAnimation = "solid";
-      parseChosenColors(value.substr(value.find(':') + 1));
-    }
-    else if (value.find("brightness:") == 0)
-    {
-      int newBrightness = atoi(value.substr(11).c_str());
-      setBrightness(newBrightness);
-    }
-    else if (value.find("flow:") == 0)
-    {
-      currentAnimation = "flow";
-      parseChosenColors(value.substr(value.find(':') + 1));
-    }
-    else if (value.find("emanate:") == 0)
-    {
-      currentAnimation = "emanate";
-      parseChosenColors(value.substr(value.find(':') + 1));
-    }
-    else
-    {
-      parseAnimationAndColor(value);
-    }
-  }
-
-  void parseAnimationAndColor(const std::string &value)
-  {
-    size_t colonPos = value.find(':');
-    if (colonPos != std::string::npos)
-    {
-      currentAnimation = value.substr(0, colonPos);
-      parseChosenColors(value.substr(colonPos + 1));
-    }
-  }
-
-  void parseChosenColors(const std::string &colorString)
-  {
-    chosenColors.clear();
-    size_t pos = 0;
-    while (pos < colorString.length())
-    {
-      size_t nextComma = colorString.find(',', pos);
-      if (nextComma == std::string::npos)
-        nextComma = colorString.length();
-      uint32_t color = strtol(colorString.substr(pos, nextComma - pos).c_str(), NULL, 16);
-      chosenColors.push_back(color);
-      pos = nextComma + 1;
+      Serial.println("Msg: Queue full, dropped");
     }
   }
 };
+
+void parseColors(const std::string &value)
+{
+  if (value == "blue")
+  {
+    currentAnimation = "";
+    setAllLEDsToBlue();
+  }
+  else if (value == "red")
+  {
+    currentAnimation = "";
+    setAllLEDsToRed();
+  }
+  else if (value == "rainbow_flow")
+  {
+    currentAnimation = "rainbow_flow";
+  }
+  else if (value.find("solid:") == 0)
+  {
+    currentAnimation = "solid";
+    parseChosenColors(value.substr(value.find(':') + 1));
+  }
+  else if (value.find("brightness:") == 0)
+  {
+    int newBrightness = atoi(value.substr(11).c_str());
+    setBrightness(newBrightness);
+  }
+  else if (value.find("flow:") == 0)
+  {
+    currentAnimation = "flow";
+    parseChosenColors(value.substr(value.find(':') + 1));
+  }
+  else if (value.find("emanate:") == 0)
+  {
+    currentAnimation = "emanate";
+    parseChosenColors(value.substr(value.find(':') + 1));
+  }
+  else
+  {
+    parseAnimationAndColor(value);
+  }
+}
+
+void parseAnimationAndColor(const std::string &value)
+{
+  size_t colonPos = value.find(':');
+  if (colonPos != std::string::npos)
+  {
+    currentAnimation = value.substr(0, colonPos);
+    parseChosenColors(value.substr(colonPos + 1));
+  }
+}
+
+void parseChosenColors(const std::string &colorString)
+{
+  chosenColors.clear();
+  size_t pos = 0;
+  while (pos < colorString.length())
+  {
+    size_t nextComma = colorString.find(',', pos);
+    if (nextComma == std::string::npos)
+      nextComma = colorString.length();
+    uint32_t color = strtol(colorString.substr(pos, nextComma - pos).c_str(), NULL, 16);
+    chosenColors.push_back(color);
+    pos = nextComma + 1;
+  }
+}
 
 void setup()
 {
@@ -127,6 +138,7 @@ void setup()
   while (!Serial)
     ; // Wait for serial port to connect. Needed for native USB only.
   setupStrips();
+  messageQueue = xQueueCreate(8, MAX_MESSAGE_LENGTH);
 
   // Starting animation
   currentAnimation = "rainbow_flow";
@@ -154,6 +166,14 @@ void setup()
 
 void loop()
 {
+  char message[MAX_MESSAGE_LENGTH];
+  while (xQueueReceive(messageQueue, message, 0) == pdTRUE)
+  {
+    Serial.print("Msg: ");
+    Serial.println(message);
+    parseColors(message);
+  }
+
   if (currentAnimation == "rainbow_flow")
   {
     setRainbowFlow();
@@ -178,6 +198,7 @@ void loop()
   {
     setFlow(chosenColors);
   }
+  else if (currentAnimation == "emanate" && !chosenColors.empty())
   {
     setEmanate(chosenColors);
   }

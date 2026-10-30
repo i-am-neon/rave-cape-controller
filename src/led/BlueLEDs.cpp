@@ -8,6 +8,6 @@ void setAllLEDsToBlue()
     {
       strips[i].setPixelColor(j, strips[i].Color(0, 0, 255)); // Set color to blue
     }
-    strips[i].show();
+    showStrip(strips[i]);
   }
 }

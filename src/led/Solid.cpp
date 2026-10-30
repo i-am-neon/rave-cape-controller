@@ -13,6 +13,6 @@ void setSolid(const std::vector<uint32_t> &colors)
       uint32_t color = interpolateColorBasedOnCount(colors, j, numLEDs);
       strips[i].setPixelColor(j, color);
     }
-    strips[i].show();
+    showStrip(strips[i]);
   }
 }

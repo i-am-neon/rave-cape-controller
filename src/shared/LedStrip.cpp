@@ -29,6 +29,29 @@ void setBrightness(int brightness)
   for (int i = 0; i < NUM_STRIPS; i++)
   {
     strips[i].setBrightness(brightness);
-    strips[i].show();
+    showStrip(strips[i]);
   }
+}
+
+void showStrip(Adafruit_NeoPixel &strip)
+{
+  // Scale the whole frame down if it would draw more than the power cap allows
+  uint8_t *pixels = strip.getPixels();
+  uint16_t numBytes = strip.numPixels() * 3;
+  uint32_t channelSum = 0;
+  for (uint16_t i = 0; i < numBytes; i++)
+  {
+    channelSum += pixels[i];
+  }
+
+  if (channelSum > MAX_CHANNEL_SUM_PER_STRIP)
+  {
+    uint32_t scale = (MAX_CHANNEL_SUM_PER_STRIP << 8) / channelSum; // 0-255 fixed point
+    for (uint16_t i = 0; i < numBytes; i++)
+    {
+      pixels[i] = (pixels[i] * scale) >> 8;
+    }
+  }
+
+  strip.show();
 }
