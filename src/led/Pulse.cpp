@@ -8,14 +8,17 @@ void setPulse(const std::vector<uint32_t> &colors)
 {
   static float brightness = 0.2;
   static bool increasing = true;
-  const float brightnessStep = 0.05;
-  const long interval = 50;
+  const float brightnessStep = 0.02; // 0.05 per 50 ms, now in 50 fps steps
+  const long interval = 20;
   static unsigned long previousMillis = 0;
 
   unsigned long currentMillis = millis();
-  if (currentMillis - previousMillis >= interval)
+  unsigned long elapsed = currentMillis - previousMillis;
+  if (elapsed >= interval)
   {
     previousMillis = currentMillis;
+    // Step by the time that actually passed, so the pulse speed holds even if a frame runs long
+    float step = brightnessStep * min(elapsed, 100UL) / interval;
     int numLEDs = strips[0].numPixels();
 
     for (int i = 0; i < NUM_STRIPS; i++)
@@ -35,7 +38,7 @@ void setPulse(const std::vector<uint32_t> &colors)
 
     if (increasing)
     {
-      brightness += brightnessStep;
+      brightness += step;
       if (brightness >= 1.0)
       {
         brightness = 1.0;
@@ -44,7 +47,7 @@ void setPulse(const std::vector<uint32_t> &colors)
     }
     else
     {
-      brightness -= brightnessStep;
+      brightness -= step;
       if (brightness <= 0.2)
       {
         brightness = 0.2;

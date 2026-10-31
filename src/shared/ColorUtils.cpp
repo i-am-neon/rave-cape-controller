@@ -40,21 +40,13 @@ uint32_t interpolateGradient(const std::vector<uint32_t> &colors, float position
   if (colors.empty())
     return 0;
 
-  // Ensure smooth transition by extending the gradient to wrap around
-  std::vector<uint32_t> extendedColors = colors;
-  extendedColors.push_back(colors[0]);
+  // The gradient wraps from the last color back to the first so flows loop seamlessly.
+  // Called for every LED every frame, so no copying of the color list.
+  int count = colors.size();
+  float segmentLength = 1.0f / count;
+  int leftIndex = min((int)(position / segmentLength), count - 1);
+  int rightIndex = (leftIndex + 1) % count;
+  float localPosition = (position - leftIndex * segmentLength) / segmentLength;
 
-  if (extendedColors.size() < 2)
-    return extendedColors[0];
-
-  float segmentLength = 1.0 / (extendedColors.size() - 1);
-  int leftIndex = position / segmentLength;
-  int rightIndex = leftIndex + 1;
-
-  if (rightIndex >= extendedColors.size())
-    rightIndex = 0;
-
-  float localPosition = (position - (leftIndex * segmentLength)) / segmentLength;
-
-  return interpolateColor(extendedColors[leftIndex], extendedColors[rightIndex], localPosition);
+  return interpolateColor(colors[leftIndex], colors[rightIndex], localPosition);
 }

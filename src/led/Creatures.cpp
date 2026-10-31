@@ -70,14 +70,18 @@ void stepCauldron(float t)
   };
   static Bubble bubbles[40];
 
-  for (int s = 0; s < S; s++)
+  // The glow from below never changes, so compute it once
+  static RGB background[L];
+  static bool ready = false;
+  if (!ready)
   {
     for (int l = 0; l < L; l++)
-    {
-      float y = l / (float)(L - 1);
-      framePut(s, l, mixColor(rgb(12, 0, 22), rgb(0, 70, 5), powf(y, 2.2f)));
-    }
+      background[l] = mixColor(rgb(12, 0, 22), rgb(0, 70, 5), powf(l / (float)(L - 1), 2.2f));
+    ready = true;
   }
+  for (int s = 0; s < S; s++)
+    for (int l = 0; l < L; l++)
+      framePut(s, l, background[l]);
   if (randFloat(0, 1) < 0.18f)
   {
     for (Bubble &b : bubbles)

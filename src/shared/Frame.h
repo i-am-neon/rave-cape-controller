@@ -29,6 +29,11 @@ void frameFill(RGB c);
 void frameFade(float k);
 void showFrame();
 
+// Fast sine/cosine for animations: a 1024-entry table with linear interpolation (error
+// below 1e-5), several times quicker than sinf on the ESP32
+float fastSin(float x);
+inline float fastCos(float x) { return fastSin(x + 1.5707963f); }
+
 int randInt(int n);                // 0 .. n-1
 float randFloat(float a, float b); // a .. b
 

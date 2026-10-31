@@ -19,7 +19,7 @@ void stepGlitch(float t)
 
   for (int s = 0; s < S; s++)
     for (int l = 0; l < L; l++)
-      framePut(s, l, scaleColor(rgb(40, 0, 70), 0.7f + 0.3f * sinf(l * 0.5f + t * 9 + s)));
+      framePut(s, l, scaleColor(rgb(40, 0, 70), 0.7f + 0.3f * fastSin(l * 0.5f + t * 9 + s)));
 
   static const RGB glitchColors[3] = {rgb(255, 255, 255), rgb(255, 0, 40), rgb(0, 255, 230)};
   int segments = randFloat(0, 1) < 0.25f ? 1 + randInt(3) : 0;
@@ -35,7 +35,7 @@ void stepGlitch(float t)
 void stepReaper(float t)
 {
   frameFade(0.9f);
-  float pos = (L - 1) * (0.5f - 0.5f * cosf(t * 1.1f));
+  float pos = (L - 1) * (0.5f - 0.5f * fastCos(t * 1.1f));
   for (int s = 0; s < S; s++)
     for (int k = -2; k <= 2; k++)
       frameAdd(s, (int)roundf(pos) + k, scaleColor(rgb(190, 140, 255), 1 - abs(k) / 3.0f));

@@ -29,7 +29,7 @@ RGB scaleColor(RGB c, float k)
 
 RGB hsvColor(float h, float s, float v)
 {
-  h = fmodf(fmodf(h, 360) + 360, 360) / 60;
+  h = (h - 360 * floorf(h / 360)) / 60; // wrap into 0-360 without fmodf (hot path)
   int i = (int)h;
   float f = h - i;
   float p = v * (1 - s), q = v * (1 - s * f), t = v * (1 - s * (1 - f));
@@ -110,6 +110,24 @@ void showFrame()
     }
     showStrip(strips[s]);
   }
+}
+
+#define SIN_TABLE_SIZE 1024
+static float sinTable[SIN_TABLE_SIZE + 1];
+static bool sinTableReady = false;
+
+float fastSin(float x)
+{
+  if (!sinTableReady)
+  {
+    for (int i = 0; i <= SIN_TABLE_SIZE; i++)
+      sinTable[i] = sinf(i * 2 * PI / SIN_TABLE_SIZE);
+    sinTableReady = true;
+  }
+  float index = x * (SIN_TABLE_SIZE / (2 * PI));
+  float whole = floorf(index);
+  int i = ((int)whole) & (SIN_TABLE_SIZE - 1); // wraps negative angles too
+  return sinTable[i] + (sinTable[i + 1] - sinTable[i]) * (index - whole);
 }
 
 int randInt(int n)

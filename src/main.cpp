@@ -225,6 +225,16 @@ void setup()
 
 void loop()
 {
+  // Every 5 seconds, log the slowest loop; animations are smooth while it stays under 20 ms
+  static unsigned long statsStart = 0, slowestLoop = 0;
+  unsigned long loopStart = micros();
+  if (millis() - statsStart > 5000)
+  {
+    Serial.printf("%s: slowest loop %lu us\n", currentAnimation.c_str(), slowestLoop);
+    statsStart = millis();
+    slowestLoop = 0;
+  }
+
   char message[MAX_MESSAGE_LENGTH];
   while (xQueueReceive(messageQueue, message, 0) == pdTRUE)
   {
@@ -287,4 +297,6 @@ void loop()
   {
     runSpookyAnimation(spooky);
   }
+  slowestLoop = max(slowestLoop, micros() - loopStart);
 }
+

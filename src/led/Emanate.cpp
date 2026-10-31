@@ -5,13 +5,17 @@
 void setEmanate(const std::vector<uint32_t> &colors)
 {
   static unsigned long lastUpdate = 0;
-  const long updateInterval = 50; // Interval for smoother animation
-  static int currentRadius = 0;   // Current position of the wave front
+  const long updateInterval = 20;     // 50 fps
+  const float radiusStep = 0.4f;      // LEDs per update: 1 LED per 50 ms, as before
+  static float currentRadius = 0;     // Current position of the wave front
 
   unsigned long currentMillis = millis();
-  if (currentMillis - lastUpdate > updateInterval)
+  unsigned long elapsed = currentMillis - lastUpdate;
+  if (elapsed >= updateInterval)
   {
     lastUpdate = currentMillis;
+    // Move by the time that actually passed, so the speed holds even if a frame runs long
+    float step = radiusStep * min(elapsed, 100UL) / updateInterval;
 
     int numLEDs = strips[0].numPixels();
 
@@ -21,7 +25,7 @@ void setEmanate(const std::vector<uint32_t> &colors)
       {
         // Calculate position from the center
         int distanceFromCenter = abs((numLEDs / 2) - led);
-        float position = (float)((distanceFromCenter + currentRadius) % numLEDs) / numLEDs;
+        float position = fmodf(distanceFromCenter + currentRadius, numLEDs) / numLEDs;
 
         // Interpolate color for the current LED position
         uint32_t gradientColor = interpolateGradient(colors, position);
@@ -32,6 +36,6 @@ void setEmanate(const std::vector<uint32_t> &colors)
       showStrip(strips[strip]);
     }
 
-    currentRadius = (currentRadius + 1) % numLEDs; // Increment and wrap currentRadius
+    currentRadius = fmodf(currentRadius + step, numLEDs);
   }
 }
