@@ -1,0 +1,399 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Rave Cape Emulator</title>
+<style>
+  :root { --bg: #07090f; --card: #111726; --line: #1f2940; --text: #e2e8f0; --dim: #8391a7; --pick: #f97316; }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 14px/1.4 -apple-system, system-ui, sans-serif; }
+  header { position: sticky; top: 0; z-index: 5; display: flex; flex-wrap: wrap; gap: 18px; align-items: center;
+           padding: 12px 20px; background: rgba(7,9,15,.92); backdrop-filter: blur(6px); border-bottom: 1px solid var(--line); }
+  header h1 { font-size: 18px; margin: 0 12px 0 0; }
+  header label { display: flex; gap: 8px; align-items: center; color: var(--dim); }
+  header button { background: var(--pick); color: #111; border: 0; border-radius: 8px; padding: 8px 14px; font-weight: 600; cursor: pointer; }
+  #pickCount { color: var(--pick); font-weight: 600; }
+  h2 { margin: 26px 20px 4px; font-size: 15px; color: var(--dim); font-weight: 600; letter-spacing: .04em; text-transform: uppercase; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 14px; padding: 10px 20px 20px; }
+  .card { background: var(--card); border: 2px solid var(--line); border-radius: 12px; padding: 10px; display: flex; flex-direction: column; gap: 6px; }
+  .card.picked { border-color: var(--pick); box-shadow: 0 0 18px rgba(249,115,22,.25); }
+  .card canvas { width: 100%; aspect-ratio: 190 / 300; background: #000; border-radius: 8px; cursor: zoom-in; }
+  .card .title { display: flex; justify-content: space-between; align-items: center; gap: 6px; font-weight: 600; }
+  .card .title input { width: 18px; height: 18px; accent-color: var(--pick); cursor: pointer; }
+  .card .desc { color: var(--dim); font-size: 12px; min-height: 34px; }
+  .card .power { font-size: 12px; font-variant-numeric: tabular-nums; }
+  .power .capped { color: #fbbf24; }
+  .card textarea { background: #0b1020; color: var(--text); border: 1px solid var(--line); border-radius: 6px; font: 12px/1.3 inherit; padding: 6px; resize: vertical; min-height: 30px; }
+  #focus { position: fixed; inset: 0; z-index: 10; display: none; align-items: center; justify-content: center; gap: 30px; background: rgba(0,0,0,.88); }
+  #focus.open { display: flex; }
+  #focus canvas { height: 88vh; aspect-ratio: 190 / 300; background: #000; border-radius: 12px; }
+  #focus .info { max-width: 280px; }
+  #focus .info h3 { margin: 0 0 8px; font-size: 22px; }
+  #picksOut { position: fixed; right: 20px; bottom: 20px; z-index: 6; width: 340px; display: none; }
+  #picksOut.show { display: block; }
+  #picksOut textarea { width: 100%; height: 160px; background: #0b1020; color: var(--text); border: 1px solid var(--pick); border-radius: 8px; padding: 8px; font: 12px/1.4 ui-monospace, monospace; }
+</style>
+</head>
+<body>
+<header>
+  <h1>🎃 Rave Cape Emulator</h1>
+  <label>Brightness <input id="brightness" type="range" min="0" max="255" value="255"> <span id="briVal">255</span></label>
+  <label><input id="diffuse" type="checkbox" checked> Diffusion glow</label>
+  <label><input id="flip" type="checkbox"> LED 0 at bottom</label>
+  <span><span id="pickCount">0</span> picked</span>
+  <button id="copy">Copy picks</button>
+</header>
+
+<div id="sections"></div>
+
+<div id="focus"><canvas id="focusCanvas" width="380" height="600"></canvas><div class="info"><h3 id="focusTitle"></h3><p id="focusDesc"></p><p class="power" id="focusPower"></p><p style="color:var(--dim)">Click anywhere to close</p></div></div>
+<div id="picksOut"><textarea id="picksText" readonly></textarea></div>
+
+<script>
+// ---- Cape model: mirrors the firmware (8 strips x 60 LEDs, per-strip power cap) ----
+const S = 8, L = 60;
+const MAX_CHANNEL_SUM_PER_STRIP = L * 255; // same as firmware LedStrip.h
+const TICK = 1 / 50;                       // simulate at 50 fps
+
+const rand = n => Math.floor(Math.random() * n);
+const rnd = (a, b) => a + Math.random() * (b - a);
+const clamp = v => v < 0 ? 0 : v > 255 ? 255 : v;
+const hex = h => [(h >> 16) & 255, (h >> 8) & 255, h & 255];
+const mix = (a, b, t) => [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t];
+const scale = (c, k) => [c[0] * k, c[1] * k, c[2] * k];
+function hsv(h, s, v) { // h 0-360, s/v 0-1
+  h = ((h % 360) + 360) % 360 / 60; const i = Math.floor(h), f = h - i;
+  const p = v * (1 - s), q = v * (1 - s * f), t = v * (1 - s * (1 - f));
+  const [r, g, b] = [[v, t, p], [q, v, p], [p, v, t], [p, q, v], [t, p, v], [v, p, q]][i];
+  return [r * 255, g * 255, b * 255];
+}
+function gradient(colors, pos) { // firmware interpolateGradient: wraps back to the first color
+  const ext = [...colors, colors[0]]; pos = ((pos % 1) + 1) % 1;
+  const seg = 1 / (ext.length - 1), i = Math.floor(pos / seg);
+  return mix(ext[i], ext[i + 1], (pos - i * seg) / seg);
+}
+function palette(stops, x) { // stops: [[pos 0-1, color], ...]
+  x = Math.max(0, Math.min(1, x));
+  for (let i = 1; i < stops.length; i++) if (x <= stops[i][0])
+    return mix(stops[i - 1][1], stops[i][1], (x - stops[i - 1][0]) / (stops[i][0] - stops[i - 1][0]));
+  return stops[stops.length - 1][1];
+}
+
+class Cape {
+  constructor() { this.px = Array.from({ length: S }, () => Array.from({ length: L }, () => [0, 0, 0])); }
+  set(s, l, c) { if (s >= 0 && s < S && l >= 0 && l < L) this.px[s][l] = [clamp(c[0]), clamp(c[1]), clamp(c[2])]; }
+  add(s, l, c) { if (s >= 0 && s < S && l >= 0 && l < L) { const p = this.px[s][l]; this.set(s, l, [p[0] + c[0], p[1] + c[1], p[2] + c[2]]); } }
+  fill(c) { for (let s = 0; s < S; s++) for (let l = 0; l < L; l++) this.set(s, l, c); }
+  fade(k) { for (const strip of this.px) for (const p of strip) { p[0] *= k; p[1] *= k; p[2] *= k; } }
+}
+
+// ---- Designs. l = 0 is the top of the cape (shoulders), l = 59 the bottom ----
+const fireStep = (st, cooling, sparking) => {
+  st.heat ??= Array.from({ length: S }, () => new Array(L).fill(0));
+  for (const heat of st.heat) { // classic Fire2012, index 0 = bottom of the flame
+    for (let i = 0; i < L; i++) heat[i] = Math.max(0, heat[i] - rand(((cooling * 10) / L) + 2));
+    for (let k = L - 1; k >= 2; k--) heat[k] = (heat[k - 1] + heat[k - 2] * 2) / 3;
+    if (rand(255) < sparking) { const y = rand(7); heat[y] = Math.min(255, heat[y] + rnd(160, 255)); }
+  }
+};
+const drawFire = (cape, st, stops) => {
+  for (let s = 0; s < S; s++) for (let i = 0; i < L; i++) cape.set(s, L - 1 - i, palette(stops, st.heat[s][i] / 255));
+};
+
+const DESIGNS = [
+  // --- Spooky ---
+  { id: 'bonfire', group: 'Spooky', name: 'Bonfire', desc: 'Flames licking up from the hem. Classic fire simulation per strip.',
+    step(cape, st) { fireStep(st, 55, 120); drawFire(cape, st, [[0, [0, 0, 0]], [.35, [200, 0, 0]], [.7, [255, 110, 0]], [1, [255, 220, 90]]]); } },
+  { id: 'ghostfire', group: 'Spooky', name: 'Ghost fire', desc: 'Same flames, but cold spectral blue-white.',
+    step(cape, st) { fireStep(st, 60, 110); drawFire(cape, st, [[0, [0, 0, 0]], [.35, [0, 10, 160]], [.7, [0, 170, 255]], [1, [200, 240, 255]]]); } },
+  { id: 'witchfire', group: 'Spooky', name: 'Witch fire', desc: 'Toxic green flames with purple embers.',
+    step(cape, st) { fireStep(st, 50, 130); drawFire(cape, st, [[0, [0, 0, 0]], [.3, [70, 0, 110]], [.65, [40, 200, 0]], [1, [190, 255, 90]]]); } },
+  { id: 'inferno', group: 'Spooky', name: 'Inferno', desc: 'A helix of fire spiralling up the cape: two interlocking swirls with a fast flicker.',
+    step(cape, st, t) {
+      const fire = [[0, [45, 0, 0]], [.35, [170, 0, 0]], [.7, [255, 90, 0]], [1, [255, 210, 80]]];
+      for (let s = 0; s < S; s++) for (let l = 0; l < L; l++) {
+        const angle = s / S * 2 * Math.PI;
+        const swirl = Math.sin(angle + l * 0.16 + t * 3.2);
+        const swirl2 = Math.sin(angle * 2 - l * 0.07 + t * 1.7 + 1.3);
+        const flicker = 0.85 + 0.15 * Math.sin(t * 23 + s * 7.1 + l * 1.3);
+        const heat = 0.5 + 0.5 * (0.55 * swirl + 0.45 * swirl2); // deep crimson troughs, never black
+        cape.set(s, l, palette(fire, heat ** 1.5 * flicker));
+      }
+    } },
+  { id: 'heartbeat', group: 'Spooky', name: 'Heartbeat', desc: 'Lub-dub. Each beat ripples out from your heart (upper middle of the cape).',
+    step(cape, st, t) {
+      for (let s = 0; s < S; s++) for (let l = 0; l < L; l++) {
+        const d = Math.hypot((s - 3.5) * 3, l - 12) / 60;      // distance from the heart, in seconds of delay
+        const ph = ((t * 1.05 - d) % 1 + 1) % 1;
+        const thump = x => Math.exp(-((x / .06) ** 2));
+        const e = thump(ph) + thump(ph - 1) + 0.65 * thump(ph - .28);
+        cape.set(s, l, mix([14, 0, 0], [255, 0, 10], Math.min(1, e) * Math.max(0.25, 1 - d * 1.2)));
+      }
+    } },
+  { id: 'ghost', group: 'Spooky', name: 'Ghost breath', desc: 'Slow pale breathing with misty wisps drifting down.',
+    step(cape, st, t) {
+      const breath = 0.5 - 0.5 * Math.cos(t * 2 * Math.PI / 6);
+      for (let s = 0; s < S; s++) for (let l = 0; l < L; l++) {
+        const wisp = 0.5 + 0.5 * Math.sin(l * 0.22 - t * 1.4 + s * 1.7) * Math.sin(l * 0.09 + t * 0.6 + s * 0.9);
+        cape.set(s, l, scale([150, 200, 255], 0.05 + 0.55 * breath * wisp));
+      }
+    } },
+  { id: 'drip', group: 'Spooky', name: 'Blood drip', desc: 'Drops ooze from the shoulders, fall, and pool at the hem.',
+    step(cape, st, t) {
+      st.drops ??= []; st.pool ??= new Array(S).fill(0);
+      cape.fade(0.86);
+      if (Math.random() < 0.05) st.drops.push({ s: rand(S), p: 0, v: 0, hang: rnd(0.4, 1.4) });
+      for (const d of st.drops) {
+        if (d.hang > 0) { d.hang -= TICK; d.p = 2 * (1 - d.hang / 1.4); } else { d.v += 0.06; d.p += d.v; }
+        for (let k = 0; k < 3; k++) cape.add(d.s, Math.floor(d.p) - k, scale([200, 0, 0], 1 - k * 0.3));
+        if (d.p >= L - 1) st.pool[d.s] = 1;
+      }
+      st.drops = st.drops.filter(d => d.p < L - 1);
+      for (let s = 0; s < S; s++) {
+        st.pool[s] = Math.max(0.15, st.pool[s] * 0.995);
+        for (let k = 0; k < 4; k++) cape.add(s, L - 1 - k, scale([120, 0, 0], st.pool[s] * (1 - k / 4)));
+        for (let k = 0; k < 2; k++) cape.add(s, k, [40, 0, 0]);
+      }
+    } },
+  { id: 'ecto', group: 'Spooky', name: 'Ectoplasm', desc: 'A thick, churning plasma tide of toxic green and violet over the whole cape.',
+    step(cape, st, t) {
+      const goo = [[0, [30, 0, 50]], [.4, [120, 0, 200]], [.75, [40, 255, 80]], [1, [200, 255, 200]]];
+      for (let s = 0; s < S; s++) for (let l = 0; l < L; l++) {
+        const x = s * 0.9, y = l * 0.12;
+        const v = Math.sin(x + t * 1.3) + Math.sin(y * 1.5 - t * 2.1) + Math.sin((x + y) * 0.7 + t * 1.7)
+          + Math.sin(Math.hypot(x - 3, y - 3.5) * 1.5 - t * 2);
+        cape.set(s, l, palette(goo, ((v + 4) / 8) ** 1.3));
+      }
+    } },
+  { id: 'cauldron', group: 'Spooky', name: 'Cauldron', desc: 'Green glow at the hem, bubbles rise and pop into purple mist.',
+    step(cape, st, t) {
+      st.b ??= [];
+      for (let s = 0; s < S; s++) for (let l = 0; l < L; l++) {
+        const y = l / (L - 1);
+        cape.set(s, l, mix([12, 0, 22], [0, 70, 5], y ** 2.2));
+      }
+      if (Math.random() < 0.18) st.b.push({ s: rand(S), p: L - 1, v: rnd(.25, .6), pop: rnd(5, 40) });
+      for (const b of st.b) { b.p -= b.v; const l = Math.floor(b.p);
+        if (b.p > b.pop) { cape.add(b.s, l, [70, 255, 40]); cape.add(b.s, l + 1, [10, 90, 10]); }
+        else { b.dead = (b.dead ?? 0) + 1; cape.add(b.s, l, scale([170, 60, 255], 1 - b.dead / 8)); }
+      }
+      st.b = st.b.filter(b => (b.dead ?? 0) < 8);
+    } },
+  { id: 'banshee', group: 'Spooky', name: 'Banshee', desc: 'Shockwave rings scream outward from your heart over a swirling violet storm.',
+    step(cape, st, t) {
+      const ring = hsv(260 + 60 * Math.sin(t * 0.5), 0.45, 1);
+      for (let s = 0; s < S; s++) for (let l = 0; l < L; l++) {
+        const d = Math.hypot((s - 3.5) * 3, l - 12);
+        const crest = Math.max(0, Math.sin(d * 0.35 - t * 6)) ** 3 * Math.max(0.3, 1 - d / 80);
+        const swirl = 0.5 + 0.5 * Math.sin(s * 0.8 - l * 0.1 + t * 1.5);
+        cape.set(s, l, mix(mix([25, 0, 45], [70, 0, 130], swirl), ring, crest));
+      }
+    } },
+  { id: 'glitch', group: 'Spooky', name: 'Haunted glitch', desc: 'Possessed electronics: dim violet hum, random corrupted segments, sudden blackouts.',
+    step(cape, st, t) {
+      st.black ??= 0;
+      if (st.black > t) { cape.fill([0, 0, 0]); return; }
+      if (Math.random() < 0.004) st.black = t + rnd(.1, .4);
+      for (let s = 0; s < S; s++) for (let l = 0; l < L; l++)
+        cape.set(s, l, scale([40, 0, 70], 0.7 + 0.3 * Math.sin(l * .5 + t * 9 + s)));
+      const n = Math.random() < .25 ? 1 + rand(3) : 0;
+      for (let i = 0; i < n; i++) {
+        const s = rand(S), a = rand(L), len = 3 + rand(14), c = [[255, 255, 255], [255, 0, 40], [0, 255, 230]][rand(3)];
+        for (let l = a; l < a + len; l++) cape.set(s, l, c);
+      }
+    } },
+  { id: 'reaper', group: 'Spooky', name: 'Reaper scan', desc: 'A cold violet band sweeps down your body and back, leaving a ghostly trail.',
+    step(cape, st, t) {
+      cape.fade(0.9);
+      const pos = (L - 1) * (0.5 - 0.5 * Math.cos(t * 1.1));
+      for (let s = 0; s < S; s++) for (let k = -2; k <= 2; k++) cape.add(s, Math.round(pos) + k, scale([190, 140, 255], 1 - Math.abs(k) / 3));
+    } },
+  { id: 'rain', group: 'Spooky', name: 'Digital rain', desc: 'Green code rain, like the neon cape in the app icon.',
+    step(cape, st) {
+      st.d ??= Array.from({ length: S * 2 }, (_, i) => ({ s: i % S, p: -rand(L), v: rnd(.3, .9) }));
+      cape.fade(0.88);
+      for (const d of st.d) {
+        d.p += d.v; if (d.p > L + 5) { d.p = -rand(20); d.v = rnd(.3, .9); }
+        cape.set(d.s, Math.floor(d.p), [170, 255, 170]);
+        cape.add(d.s, Math.floor(d.p) - 1, [0, 140, 20]);
+      }
+    } },
+  { id: 'pumpkin', group: 'Spooky', name: 'Pumpkin swirl', desc: 'Orange and purple barber-pole flowing diagonally down the cape.',
+    step(cape, st, t) {
+      const cols = [hex(0xff5000), hex(0x6a00ff)];
+      for (let s = 0; s < S; s++) for (let l = 0; l < L; l++) cape.set(s, l, gradient(cols, (l + s * 5 - t * 18) / 40));
+    } },
+  { id: 'candycorn', group: 'Spooky', name: 'Candy corn', desc: 'Yellow, orange and white bands marching down.',
+    step(cape, st, t) {
+      const cols = [hex(0xffd000), hex(0xff5a00), hex(0xfff0d0)];
+      for (let s = 0; s < S; s++) for (let l = 0; l < L; l++) {
+        const x = ((l - t * 9) / 7 % 3 + 3) % 3, i = Math.floor(x), f = x - i;
+        cape.set(s, l, f < .8 ? cols[i] : mix(cols[i], cols[(i + 1) % 3], (f - .8) / .2));
+      }
+    } },
+  { id: 'aurora', group: 'Spooky', name: 'Spectral veil', desc: 'Slow purple-teal aurora shimmering across the whole cape.',
+    step(cape, st, t) {
+      for (let s = 0; s < S; s++) for (let l = 0; l < L; l++) {
+        const n = Math.sin(s * .7 + t * .5) + Math.sin(l * .09 - t * .8 + s * .3) + Math.sin((s + l * .2) * .5 + t * .3);
+        const v = Math.max(0, Math.sin(l * .15 + t * .9 + s * .5 + n));
+        cape.set(s, l, hsv(270 - 90 * (0.5 + n / 6), 0.9, 0.12 + 0.8 * v ** 2));
+      }
+    } },
+
+  // --- Existing firmware animations, ported 1:1 for comparison ---
+  { id: 'rainbow_flow', group: 'Already on the cape', name: 'Rainbow flow', desc: 'Current boot default. The power budget is calibrated to this one.',
+    step(cape, st) {
+      st.j = ((st.j ?? 0) + 1.4) % 256; // firmware steps once per ~14.4 ms loop (8 strip writes); we tick every 20 ms
+      const wheel = p => { p = 255 - p; if (p < 85) return [255 - p * 3, 0, p * 3]; if (p < 170) { p -= 85; return [0, p * 3, 255 - p * 3]; } p -= 170; return [p * 3, 255 - p * 3, 0]; };
+      for (let s = 0; s < S; s++) for (let k = 0; k < L; k++) cape.set(s, L - 1 - k, wheel(((Math.floor(k * 256 / L)) + st.j) & 255));
+    } },
+  { id: 'sunset_pulse', group: 'Already on the cape', name: 'Sunset pulse', desc: 'pulse:833ab4,fd1d1d,fcb045 — the one that used to trip the banks.',
+    step(cape, st) {
+      st.b ??= .2; st.up ??= true;
+      const cols = [hex(0x833ab4), hex(0xfd1d1d), hex(0xfcb045)];
+      for (let s = 0; s < S; s++) for (let j = 0; j < L; j++) {
+        const r = j / (L - 1), c = j < L / 2 ? mix(cols[0], cols[1], 2 * r) : mix(cols[1], cols[2], 2 * (r - .5));
+        cape.set(s, j, scale(c, st.b));
+      }
+      if (st.up) { st.b += .05; if (st.b >= 1) { st.b = 1; st.up = false; } } else { st.b -= .05; if (st.b <= .2) { st.b = .2; st.up = true; } }
+    } },
+];
+
+// ---- Output stage: brightness then the firmware's per-strip power cap ----
+function output(cape, brightness) {
+  let worst = 0, sum = 0;
+  const out = cape.px.map(strip => {
+    let px = strip.map(p => [Math.floor(p[0] * brightness / 255), Math.floor(p[1] * brightness / 255), Math.floor(p[2] * brightness / 255)]);
+    let raw = 0; for (const p of px) raw += p[0] + p[1] + p[2];
+    worst = Math.max(worst, raw);
+    if (raw > MAX_CHANNEL_SUM_PER_STRIP) {
+      const k = Math.floor((MAX_CHANNEL_SUM_PER_STRIP * 256) / raw);
+      px = px.map(p => [(p[0] * k) >> 8, (p[1] * k) >> 8, (p[2] * k) >> 8]);
+      raw = 0; for (const p of px) raw += p[0] + p[1] + p[2];
+    }
+    sum += raw; return px;
+  });
+  return { out, load: sum / (S * MAX_CHANNEL_SUM_PER_STRIP), rawPeak: worst / MAX_CHANNEL_SUM_PER_STRIP };
+}
+
+// ---- Rendering: trapezoid matching the real cape (14" shoulders -> 24" hem, ~39" long) ----
+function ledXY(s, l, w, h, flip) {
+  const row = flip ? L - 1 - l : l, y = row / (L - 1);
+  const half = (7 + 5 * y) / 12, x = 0.5 + ((s - 3.5) / 3.5) * half * 0.42;
+  return [x * w, (0.04 + 0.92 * y) * h];
+}
+const scratch = document.createElement('canvas');
+function draw(canvas, out, opts) {
+  const ctx = canvas.getContext('2d'), w = canvas.width, h = canvas.height;
+  scratch.width = w; scratch.height = h;
+  const sc = scratch.getContext('2d');
+  sc.fillStyle = '#000'; sc.fillRect(0, 0, w, h);
+  const r = Math.max(1.6, h / 150);
+  for (let s = 0; s < S; s++) for (let l = 0; l < L; l++) {
+    const [R, G, B] = out[s][l]; if (R + G + B < 3) continue;
+    const [x, y] = ledXY(s, l, w, h, opts.flip);
+    sc.fillStyle = `rgb(${R},${G},${B})`; sc.beginPath(); sc.arc(x, y, r, 0, 7); sc.fill();
+  }
+  ctx.globalCompositeOperation = 'source-over'; ctx.filter = 'none';
+  ctx.fillStyle = '#000'; ctx.fillRect(0, 0, w, h);
+  if (opts.diffuse) {
+    ctx.globalCompositeOperation = 'lighter';
+    ctx.filter = `blur(${(h / 60).toFixed(1)}px)`; ctx.drawImage(scratch, 0, 0); ctx.drawImage(scratch, 0, 0);
+    ctx.filter = `blur(${(h / 160).toFixed(1)}px)`; ctx.drawImage(scratch, 0, 0);
+    ctx.filter = 'none'; ctx.globalAlpha = .5; ctx.drawImage(scratch, 0, 0); ctx.globalAlpha = 1;
+    ctx.globalCompositeOperation = 'source-over';
+  } else ctx.drawImage(scratch, 0, 0);
+}
+
+// ---- UI ----
+const state = DESIGNS.map(d => ({ d, cape: new Cape(), st: {}, picked: false, note: '', loadAvg: 0, peak: 0, last: null }));
+const sections = document.getElementById('sections');
+for (const group of [...new Set(DESIGNS.map(d => d.group))]) {
+  const h2 = document.createElement('h2'); h2.textContent = group; sections.append(h2);
+  const grid = document.createElement('div'); grid.className = 'grid'; sections.append(grid);
+  for (const it of state.filter(x => x.d.group === group)) {
+    const card = document.createElement('div'); card.className = 'card'; card.dataset.id = it.d.id;
+    card.innerHTML = `<div class="title"><span>${it.d.name}</span><input type="checkbox" title="Pick this design"></div>
+      <canvas width="190" height="300"></canvas><div class="desc">${it.d.desc}</div><div class="power"></div>
+      <textarea placeholder="Notes (colors, speed, tweaks)…"></textarea>`;
+    grid.append(card);
+    it.canvas = card.querySelector('canvas'); it.powerEl = card.querySelector('.power'); it.card = card;
+    card.querySelector('input').onchange = e => { it.picked = e.target.checked; card.classList.toggle('picked', it.picked); updatePicks(); };
+    card.querySelector('textarea').oninput = e => { it.note = e.target.value; updatePicks(); };
+    it.canvas.onclick = () => openFocus(it);
+  }
+}
+let focused = null;
+const focusEl = document.getElementById('focus');
+function openFocus(it) { focused = it; focusEl.classList.add('open'); document.getElementById('focusTitle').textContent = it.d.name; document.getElementById('focusDesc').textContent = it.d.desc; }
+focusEl.onclick = () => { focused = null; focusEl.classList.remove('open'); };
+
+function updatePicks() {
+  const picks = state.filter(x => x.picked);
+  document.getElementById('pickCount').textContent = picks.length;
+  const text = picks.length ? 'Cape picks:\n' + picks.map(p => `- ${p.d.name} (${p.d.id})${p.note ? ' — ' + p.note.replace(/\n/g, ' ') : ''}`).join('\n') : '';
+  document.getElementById('picksText').value = text;
+  document.getElementById('picksOut').classList.toggle('show', picks.length > 0);
+  return text;
+}
+document.getElementById('copy').onclick = async () => {
+  const text = updatePicks() || 'No picks yet';
+  try { await navigator.clipboard.writeText(text); } catch { document.getElementById('picksText').select(); document.execCommand('copy'); }
+  const b = document.getElementById('copy'); b.textContent = 'Copied!'; setTimeout(() => b.textContent = 'Copy picks', 1200);
+};
+const bri = document.getElementById('brightness');
+bri.oninput = () => document.getElementById('briVal').textContent = bri.value;
+
+function powerText(it) {
+  const pct = Math.round(it.loadAvg * 100), capped = it.peak > 1.001;
+  return `Power: ${pct}% of budget${capped ? ` <span class="capped">· capped (wanted ${Math.round(it.peak * 100)}%, looks dimmer)</span>` : ''}`;
+}
+
+// Fixed-step simulation, render on animation frames
+let simTime = 0, lastReal = performance.now();
+function frame(now) {
+  const opts = { diffuse: document.getElementById('diffuse').checked, flip: document.getElementById('flip').checked };
+  const steps = Math.min(5, Math.floor((now - lastReal) / 1000 / TICK));
+  if (steps > 0) lastReal += steps * TICK * 1000;
+  for (let i = 0; i < steps; i++) {
+    simTime += TICK;
+    for (const it of state) {
+      it.d.step(it.cape, it.st, simTime);
+      const o = output(it.cape, +bri.value);
+      it.last = o.out;
+      it.loadAvg = it.loadAvg * 0.97 + o.load * 0.03;
+      it.peak = Math.max(o.rawPeak, it.peak * 0.995);
+    }
+  }
+  for (const it of state) if (it.last) { draw(it.canvas, it.last, opts); it.powerEl.innerHTML = powerText(it); }
+  if (focused?.last) { draw(document.getElementById('focusCanvas'), focused.last, opts); document.getElementById('focusPower').innerHTML = powerText(focused); }
+  requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+window.__cape = { state, output, DESIGNS, Cape, TICK }; // hook for automated checks
+
+// ?compare: replay frames rendered by the real C++ firmware (tools/host_test.sh parity)
+// under each design, to check the port matches the JavaScript original.
+if (location.search.includes('compare')) {
+  fetch('cpp_frames.json').then(r => r.json()).then(cpp => {
+    const replays = [];
+    for (const it of state) {
+      const flat = cpp[it.d.id]; if (!flat) continue;
+      const frames = flat.map(f => Array.from({ length: S }, (_, s) => Array.from({ length: L }, (_, l) => f.slice((s * L + l) * 3, (s * L + l) * 3 + 3))));
+      const label = document.createElement('div'); label.className = 'desc'; label.style.minHeight = '0'; label.textContent = '↓ C++ firmware replay';
+      const canvas = document.createElement('canvas'); canvas.width = 190; canvas.height = 300;
+      it.canvas.after(label, canvas);
+      replays.push({ canvas, frames });
+    }
+    const t0 = performance.now();
+    (function replay(now) {
+      const opts = { diffuse: document.getElementById('diffuse').checked, flip: document.getElementById('flip').checked };
+      const i = Math.max(0, Math.floor((now - t0) / 1000 / TICK));
+      for (const r of replays) draw(r.canvas, r.frames[i % r.frames.length], opts);
+      requestAnimationFrame(replay);
+    })(t0);
+  });
+}
+</script>
+</body>
+</html>
